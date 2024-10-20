@@ -109,7 +109,16 @@ def _prepare_4d_causal_attention_mask_with_cache_position(
 
     return causal_mask
 
+class CycleModuleList(nn.ModuleList):
+    def __init__(self, modules, repeat_times=1):
+        super().__init__(modules)
+        self.repeat_times = repeat_times
+        self.indices = list(range(len(modules))) * repeat_times
 
+    def __iter__(self):
+        for idx in self.indices:
+            yield self[idx]
+    
 # Copied from transformers.models.llama.modeling_llama.LlamaRMSNorm with Llama->STTCLlama
 class STTCLlamaRMSNorm(nn.Module):
     def __init__(self, hidden_size, eps=1e-6):
@@ -905,7 +914,7 @@ class STTCLlamaModel(STTCLlamaPreTrainedModel):
         self.vocab_size = config.vocab_size
 
         self.embed_tokens = nn.Embedding(config.vocab_size, config.hidden_size, self.padding_idx)
-        self.layers = nn.ModuleList(
+        self.layers = CycleModuleList(
             [STTCLlamaDecoderLayer(config, layer_idx) for layer_idx in range(config.num_hidden_layers)]
         )
         self.norm = STTCLlamaRMSNorm(config.hidden_size, eps=config.rms_norm_eps)
