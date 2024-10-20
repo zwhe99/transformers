@@ -915,7 +915,8 @@ class STTCLlamaModel(STTCLlamaPreTrainedModel):
 
         self.embed_tokens = nn.Embedding(config.vocab_size, config.hidden_size, self.padding_idx)
         self.layers = CycleModuleList(
-            [STTCLlamaDecoderLayer(config, layer_idx) for layer_idx in range(config.num_hidden_layers)]
+            [STTCLlamaDecoderLayer(config, layer_idx) for layer_idx in range(config.num_hidden_layers)],
+            config.repeat_times,
         )
         self.norm = STTCLlamaRMSNorm(config.hidden_size, eps=config.rms_norm_eps)
         self.rotary_emb = STTCLlamaRotaryEmbedding(config=config)
