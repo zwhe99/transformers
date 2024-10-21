@@ -921,7 +921,20 @@ class STTCLlamaModel(STTCLlamaPreTrainedModel):
         self.norm = STTCLlamaRMSNorm(config.hidden_size, eps=config.rms_norm_eps)
         self.rotary_emb = STTCLlamaRotaryEmbedding(config=config)
         self.gradient_checkpointing = False
-        self.need_loss_iters = config.need_loss_iters
+        self.need_loss_iters = None
+        if isinstance(config.need_loss_iters, str):
+            if config.need_loss_iters == "all":
+                self.need_loss_iters = list(range(config.repeat_times * config.num_hidden_layers))
+            elif config.need_loss_iters == "global_last":
+                self.need_loss_iters = list(range(config.repeat_times * config.num_hidden_layers))[-1]
+            elif config.need_loss_iters == "local_last":
+                self.need_loss_iters = [i * config.num_hidden_layers + config.num_hidden_layers - 1 for i in range(config.repeat_times)]
+            else:
+                raise ValueError(f"Invalid need_loss_iters: {config.need_loss_iters}")
+        elif isinstance(config.need_loss_iters, list):
+            self.need_loss_iters = config.need_loss_iters
+        else:
+            raise ValueError(f"Invalid need_loss_iters: {config.need_loss_iters}")
 
         # Initialize weights and apply final processing
         self.post_init()
