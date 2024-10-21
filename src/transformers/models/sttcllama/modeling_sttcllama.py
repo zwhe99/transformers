@@ -32,7 +32,7 @@ from ...generation import GenerationMixin
 from ...modeling_attn_mask_utils import AttentionMaskConverter
 from ...modeling_flash_attention_utils import _flash_attention_forward
 from ...modeling_outputs import (
-    BaseModelOutputWithPast,
+    STTCBaseModelOutputWithPast,
     CausalLMOutputWithPast,
     QuestionAnsweringModelOutput,
     SequenceClassifierOutputWithPast,
@@ -921,6 +921,7 @@ class STTCLlamaModel(STTCLlamaPreTrainedModel):
         self.norm = STTCLlamaRMSNorm(config.hidden_size, eps=config.rms_norm_eps)
         self.rotary_emb = STTCLlamaRotaryEmbedding(config=config)
         self.gradient_checkpointing = False
+        self.need_loss_iters = config.need_loss_iters
 
         # Initialize weights and apply final processing
         self.post_init()
@@ -944,7 +945,7 @@ class STTCLlamaModel(STTCLlamaPreTrainedModel):
         output_hidden_states: Optional[bool] = None,
         return_dict: Optional[bool] = None,
         cache_position: Optional[torch.LongTensor] = None,
-    ) -> Union[Tuple, BaseModelOutputWithPast]:
+    ) -> Union[Tuple, STTCBaseModelOutputWithPast]:
         output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
         output_hidden_states = (
             output_hidden_states if output_hidden_states is not None else self.config.output_hidden_states
@@ -1000,8 +1001,9 @@ class STTCLlamaModel(STTCLlamaPreTrainedModel):
         all_hidden_states = () if output_hidden_states else None
         all_self_attns = () if output_attentions else None
         next_decoder_cache = None
+        need_loss_hidden_states = ()
 
-        for decoder_layer in self.layers:
+        for iter_id, decoder_layer in enumerate(self.layers):
             if output_hidden_states:
                 all_hidden_states += (hidden_states,)
 
@@ -1037,6 +1039,9 @@ class STTCLlamaModel(STTCLlamaPreTrainedModel):
             if output_attentions:
                 all_self_attns += (layer_outputs[1],)
 
+            if iter_id in self.need_loss_iters:
+                need_loss_hidden_states += (self.norm(hidden_states),)
+
         hidden_states = self.norm(hidden_states)
 
         # add hidden states from the last decoder layer
@@ -1049,7 +1054,8 @@ class STTCLlamaModel(STTCLlamaPreTrainedModel):
 
         if not return_dict:
             return tuple(v for v in [hidden_states, next_cache, all_hidden_states, all_self_attns] if v is not None)
-        return BaseModelOutputWithPast(
+        return STTCBaseModelOutputWithPast(
+            need_loss_hidden_states=need_loss_hidden_states,
             last_hidden_state=hidden_states,
             past_key_values=next_cache,
             hidden_states=all_hidden_states,
@@ -1207,6 +1213,9 @@ class STTCLlamaForCausalLM(STTCLlamaPreTrainedModel, GenerationMixin):
         )
         return_dict = return_dict if return_dict is not None else self.config.use_return_dict
 
+        assert labels is not None, "labels must be provided for loss calculation"
+        assert return_dict, "return_dict must be True"
+
         # decoder outputs consists of (dec_features, layer_state, dec_hidden, dec_attn)
         outputs = self.model(
             input_ids=input_ids,
@@ -1221,22 +1230,23 @@ class STTCLlamaForCausalLM(STTCLlamaPreTrainedModel, GenerationMixin):
             cache_position=cache_position,
         )
 
-        hidden_states = outputs[0]
-        if self.config.pretraining_tp > 1:
-            lm_head_slices = self.lm_head.weight.split(self.vocab_size // self.config.pretraining_tp, dim=0)
-            logits = [F.linear(hidden_states, lm_head_slices[i]) for i in range(self.config.pretraining_tp)]
-            logits = torch.cat(logits, dim=-1)
-        else:
-            if labels is None and not is_torchdynamo_compiling():
-                logger.warning_once(
-                    "Starting from v4.46, the `logits` model output will have the same type as the model (except at train time, where it will always be FP32)"
-                )
-            # Only compute necessary logits, and do not upcast them to float if we are not computing the loss
-            # TODO: remove the float() operation in v4.46
-            logits = self.lm_head(hidden_states[:, -num_logits_to_keep:, :]).float()
+        need_loss_hidden_states = outputs[0]
+        total_loss = 0
+        for hidden_states in need_loss_hidden_states:
+            if self.config.pretraining_tp > 1:
+                lm_head_slices = self.lm_head.weight.split(self.vocab_size // self.config.pretraining_tp, dim=0)
+                logits = [F.linear(hidden_states, lm_head_slices[i]) for i in range(self.config.pretraining_tp)]
+                logits = torch.cat(logits, dim=-1)
+            else:
+                if labels is None and not is_torchdynamo_compiling():
+                    logger.warning_once(
+                        "Starting from v4.46, the `logits` model output will have the same type as the model (except at train time, where it will always be FP32)"
+                    )
+                # Only compute necessary logits, and do not upcast them to float if we are not computing the loss
+                # TODO: remove the float() operation in v4.46
+                logits = self.lm_head(hidden_states[:, -num_logits_to_keep:, :]).float()
 
-        loss = None
-        if labels is not None:
+            loss = None
             # Upcast to float if we need to compute the loss to avoid potential precision issues
             logits = logits.float()
             # Shift so that tokens < n predict n
@@ -1249,13 +1259,10 @@ class STTCLlamaForCausalLM(STTCLlamaPreTrainedModel, GenerationMixin):
             # Enable model parallelism
             shift_labels = shift_labels.to(shift_logits.device)
             loss = loss_fct(shift_logits, shift_labels)
-
-        if not return_dict:
-            output = (logits,) + outputs[1:]
-            return (loss,) + output if loss is not None else output
+            total_loss += loss
 
         return CausalLMOutputWithPast(
-            loss=loss,
+            loss=total_loss,
             logits=logits,
             past_key_values=outputs.past_key_values,
             hidden_states=outputs.hidden_states,
