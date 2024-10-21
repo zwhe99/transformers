@@ -933,6 +933,8 @@ class STTCLlamaModel(STTCLlamaPreTrainedModel):
                 raise ValueError(f"Invalid need_loss_iters: {config.need_loss_iters}")
         elif isinstance(config.need_loss_iters, list):
             self.need_loss_iters = config.need_loss_iters
+        elif isinstance(config.need_loss_iters, int):
+            self.need_loss_iters = [config.need_loss_iters]
         else:
             raise ValueError(f"Invalid need_loss_iters: {config.need_loss_iters}")
 
