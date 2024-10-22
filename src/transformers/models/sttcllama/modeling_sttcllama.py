@@ -927,7 +927,7 @@ class STTCLlamaModel(STTCLlamaPreTrainedModel):
             if config.need_loss_iters == "all":
                 self.need_loss_iters = list(range(config.repeat_times * config.num_hidden_layers))
             elif config.need_loss_iters == "global_last":
-                self.need_loss_iters = list(range(config.repeat_times * config.num_hidden_layers))[-1]
+                self.need_loss_iters = list(range(config.repeat_times * config.num_hidden_layers))[-1:]
             elif config.need_loss_iters == "local_last":
                 self.need_loss_iters = [i * config.num_hidden_layers + config.num_hidden_layers - 1 for i in range(config.repeat_times)]
             else:
