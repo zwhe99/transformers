@@ -25,6 +25,7 @@ import torch.nn.functional as F
 import torch.utils.checkpoint
 from torch import nn
 from torch.nn import BCEWithLogitsLoss, CrossEntropyLoss, MSELoss
+from collections.abc import Iterable
 
 from ...activations import ACT2FN
 from ...cache_utils import Cache, DynamicCache, StaticCache
@@ -931,7 +932,7 @@ class STTCLlamaModel(STTCLlamaPreTrainedModel):
                 self.need_loss_iters = [i * config.num_hidden_layers + config.num_hidden_layers - 1 for i in range(config.repeat_times)]
             else:
                 raise ValueError(f"Invalid need_loss_iters: {config.need_loss_iters}")
-        elif isinstance(config.need_loss_iters, list):
+        elif isinstance(config.need_loss_iters, Iterable):
             self.need_loss_iters = config.need_loss_iters
         elif isinstance(config.need_loss_iters, int):
             self.need_loss_iters = [config.need_loss_iters]
