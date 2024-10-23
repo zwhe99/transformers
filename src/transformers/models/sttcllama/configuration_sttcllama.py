@@ -199,8 +199,8 @@ class STTCLlamaConfig(PretrainedConfig):
         self.attention_dropout = attention_dropout
         self.mlp_bias = mlp_bias
         self.head_dim = head_dim if head_dim is not None else self.hidden_size // self.num_attention_heads
-        self.repeat_mode = repeat_mode
         self.repeat_times = repeat_times
+        self.repeat_mode = repeat_mode
         self.need_loss_iters = need_loss_iters
         # Validate the correctness of rotary position embeddings parameters
         # BC: if there is a 'type' field, copy it it to 'rope_type'.
