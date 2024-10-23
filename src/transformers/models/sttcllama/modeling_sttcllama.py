@@ -110,11 +110,21 @@ def _prepare_4d_causal_attention_mask_with_cache_position(
 
     return causal_mask
 
-class CycleModuleList(nn.ModuleList):
-    def __init__(self, modules, repeat_times=1):
+class RepeatModuleList(nn.ModuleList):
+    def __init__(self, modules, repeat_times=1, repeat_mode="model-level"):
         super().__init__(modules)
         self.repeat_times = repeat_times
-        self.indices = list(range(len(modules))) * repeat_times
+        self.repeat_mode = repeat_mode
+        self.indices = None
+        if repeat_mode == "model-level":
+            self.indices = list(range(len(modules))) * repeat_times
+        elif repeat_mode == "layer-level":
+            self.indices = [i for i in list(range(len(modules))) for _ in range(repeat_times)]
+            raise NotImplementedError("layer-level repear mode not supported yet")
+        elif repeat_mode == "last-layer":
+            self.indices = list(range(len(modules))) + [len(modules) - 1] * (repeat_times - 1)
+        else:
+            raise ValueError(f"Repeat mode {repeat_mode} not recognized.")
 
     def __iter__(self):
         for idx in self.indices:
@@ -915,9 +925,10 @@ class STTCLlamaModel(STTCLlamaPreTrainedModel):
         self.vocab_size = config.vocab_size
 
         self.embed_tokens = nn.Embedding(config.vocab_size, config.hidden_size, self.padding_idx)
-        self.layers = CycleModuleList(
+        self.layers = RepeatModuleList(
             [STTCLlamaDecoderLayer(config, layer_idx) for layer_idx in range(config.num_hidden_layers)],
             config.repeat_times,
+            config.repeat_mode,
         )
         self.norm = STTCLlamaRMSNorm(config.hidden_size, eps=config.rms_norm_eps)
         self.rotary_emb = STTCLlamaRotaryEmbedding(config=config)
