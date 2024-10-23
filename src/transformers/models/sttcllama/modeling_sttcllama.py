@@ -940,6 +940,7 @@ class STTCLlamaModel(STTCLlamaPreTrainedModel):
             elif config.need_loss_iters == "global_last":
                 self.need_loss_iters = list(range(config.repeat_times * config.num_hidden_layers))[-1:]
             elif config.need_loss_iters == "local_last":
+                assert config.repeat_mode == "model-level", "local_last mode is only supported for model-level repeat"
                 self.need_loss_iters = [i * config.num_hidden_layers + config.num_hidden_layers - 1 for i in range(config.repeat_times)]
             else:
                 raise ValueError(f"Invalid need_loss_iters: {config.need_loss_iters}")
