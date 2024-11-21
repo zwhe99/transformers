@@ -440,6 +440,7 @@ class GPTNeoXSdpaAttention(GPTNeoXAttention):
                 use_cache=use_cache,
                 output_attentions=output_attentions,
                 cache_position=cache_position,
+                position_embeddings=position_embeddings,
             )
 
         bsz, q_len, _ = hidden_states.size()
