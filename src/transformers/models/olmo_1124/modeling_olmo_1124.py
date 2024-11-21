@@ -88,8 +88,6 @@ class Olmo1124RotaryEmbedding(nn.Module):
         return cos.to(dtype=x.dtype), sin.to(dtype=x.dtype)
 
 
-# copied from transformers.models.llama.modeling_llama.LlamaLinearScalingRotaryEmbedding with Llama->Olmo1124
-# TODO(joao): add me back asap :)
 class Olmo1124LinearScalingRotaryEmbedding(Olmo1124RotaryEmbedding):
     """Olmo1124RotaryEmbedding extended with linear scaling. Credits to the Reddit user /u/kaiokendev"""
 
@@ -100,8 +98,6 @@ class Olmo1124LinearScalingRotaryEmbedding(Olmo1124RotaryEmbedding):
         return cos, sin
 
 
-# copied from transformers.models.llama.modeling_llama.LlamaDynamicNTKScalingRotaryEmbedding with Llama->Olmo1124
-# TODO(joao): add me back asap :)
 class Olmo1124DynamicNTKScalingRotaryEmbedding(Olmo1124RotaryEmbedding):
     """Olmo1124RotaryEmbedding extended with Dynamic NTK scaling. Credits to the Reddit users /u/bloc97 and /u/emozilla"""
 
