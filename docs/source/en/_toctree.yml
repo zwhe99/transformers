@@ -460,6 +460,8 @@
         title: Longformer
       - local: model_doc/longt5
         title: LongT5
+      - local: model_doc/loopllama
+        title: LoopLlama
       - local: model_doc/luke
         title: LUKE
       - local: model_doc/m2m_100

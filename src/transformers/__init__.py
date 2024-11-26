@@ -527,6 +527,7 @@ _import_structure = {
     "models.levit": ["LevitConfig"],
     "models.lilt": ["LiltConfig"],
     "models.llama": ["LlamaConfig"],
+    "models.loopllama": ["LoopLlamaConfig"],
     "models.llava": [
         "LlavaConfig",
         "LlavaProcessor",
@@ -2572,6 +2573,16 @@ else:
             "LlamaForTokenClassification",
             "LlamaModel",
             "LlamaPreTrainedModel",
+        ]
+    )
+    _import_structure["models.loopllama"].extend(
+        [
+            "LoopLlamaForCausalLM",
+            "LoopLlamaForQuestionAnswering",
+            "LoopLlamaForSequenceClassification",
+            "LoopLlamaForTokenClassification",
+            "LoopLlamaModel",
+            "LoopLlamaPreTrainedModel",
         ]
     )
     _import_structure["models.llava"].extend(
@@ -4760,6 +4771,7 @@ else:
     )
     _import_structure["models.gptj"].extend(["FlaxGPTJForCausalLM", "FlaxGPTJModel", "FlaxGPTJPreTrainedModel"])
     _import_structure["models.llama"].extend(["FlaxLlamaForCausalLM", "FlaxLlamaModel", "FlaxLlamaPreTrainedModel"])
+    _import_structure["models.loopllama"].extend(["FlaxLoopLlamaForCausalLM", "FlaxLoopLlamaModel", "FlaxLoopLlamaPreTrainedModel"])
     _import_structure["models.gemma"].extend(["FlaxGemmaForCausalLM", "FlaxGemmaModel", "FlaxGemmaPreTrainedModel"])
     _import_structure["models.longt5"].extend(
         [
@@ -5397,6 +5409,7 @@ if TYPE_CHECKING:
     from .models.levit import LevitConfig
     from .models.lilt import LiltConfig
     from .models.llama import LlamaConfig
+    from .models.loopllama import LoopLlamaConfig
     from .models.llava import (
         LlavaConfig,
         LlavaProcessor,
@@ -7255,6 +7268,14 @@ if TYPE_CHECKING:
             LlamaModel,
             LlamaPreTrainedModel,
         )
+        from .models.loopllama import (
+            LoopLlamaForCausalLM,
+            LoopLlamaForQuestionAnswering,
+            LoopLlamaForSequenceClassification,
+            LoopLlamaForTokenClassification,
+            LoopLlamaModel,
+            LoopLlamaPreTrainedModel,
+        )
         from .models.llava import (
             LlavaForConditionalGeneration,
             LlavaPreTrainedModel,
@@ -9013,6 +9034,11 @@ if TYPE_CHECKING:
             FlaxLlamaForCausalLM,
             FlaxLlamaModel,
             FlaxLlamaPreTrainedModel,
+        )
+        from .models.loopllama import (
+            FlaxLoopLlamaForCausalLM,
+            FlaxLoopLlamaModel,
+            FlaxLoopLlamaPreTrainedModel,
         )
         from .models.longt5 import (
             FlaxLongT5ForConditionalGeneration,
