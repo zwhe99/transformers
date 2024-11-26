@@ -13,6 +13,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import random
 import collections
 import copy
 import functools
@@ -5459,6 +5460,42 @@ class SequenceSummary(nn.Module):
         output = self.last_dropout(output)
 
         return output
+
+
+class ModelLevelLoopModuleList(nn.ModuleList):
+    def __init__(self, modules, loop_times=1, loop_random=False):
+        super().__init__(modules)
+        self.loop_times = loop_times
+        self.loop_random = loop_random
+
+        self.indices = None
+        self.loop_ids = None
+        self.start_of_loop = None
+
+        self._generate_indices(loop_times)
+        self._generate_loop_ids(loop_times)
+        self._generate_start_of_loop(loop_times)
+
+    def _generate_indices(self, loop_times):
+        self.indices = list(range(len(self))) * loop_times
+
+    def _generate_loop_ids(self, loop_times):
+        self.loop_ids = [lid + 1 for lid in range(loop_times) for mid in range(len(self))]
+
+    def _generate_start_of_loop(self, loop_times):
+        self.start_of_loop = [mid == 0 for lid in range(loop_times) for mid in range(len(self))]
+
+    def __iter__(self):
+        if self.training and self.loop_random:
+            loop_times = random.randint(1, self.loop_times)
+        else:
+            loop_times = self.loop_times
+        self._generate_indices(loop_times)
+        self._generate_loop_ids(loop_times)
+        self._generate_start_of_loop(loop_times)
+
+        for idx, loop_id, start_of_loop in zip(self.indices, self.loop_ids, self.start_of_loop):
+            yield self[idx], loop_id, start_of_loop
 
 
 def unwrap_model(model: nn.Module, recursive: bool = False) -> nn.Module:

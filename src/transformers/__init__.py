@@ -684,6 +684,10 @@ _import_structure = {
         "Qwen2Config",
         "Qwen2Tokenizer",
     ],
+    "models.loopqwen2": [
+        "LoopQwen2Config",
+       
+    ],
     "models.qwen2_audio": [
         "Qwen2AudioConfig",
         "Qwen2AudioEncoderConfig",
@@ -3142,6 +3146,16 @@ else:
             "Qwen2PreTrainedModel",
         ]
     )
+    _import_structure["models.loopqwen2"].extend(
+        [
+            "LoopQwen2ForCausalLM",
+            "LoopQwen2ForQuestionAnswering",
+            "LoopQwen2ForSequenceClassification",
+            "LoopQwen2ForTokenClassification",
+            "LoopQwen2Model",
+            "LoopQwen2PreTrainedModel",
+        ]
+    )
     _import_structure["models.qwen2_audio"].extend(
         [
             "Qwen2AudioEncoder",
@@ -5593,6 +5607,7 @@ if TYPE_CHECKING:
     from .models.pvt import PvtConfig
     from .models.pvt_v2 import PvtV2Config
     from .models.qwen2 import Qwen2Config, Qwen2Tokenizer
+    from .models.loopqwen2 import LoopQwen2Config
     from .models.qwen2_audio import (
         Qwen2AudioConfig,
         Qwen2AudioEncoderConfig,
@@ -7707,6 +7722,14 @@ if TYPE_CHECKING:
             Qwen2ForTokenClassification,
             Qwen2Model,
             Qwen2PreTrainedModel,
+        )
+        from .models.loopqwen2 import (
+            LoopQwen2ForCausalLM,
+            LoopQwen2ForQuestionAnswering,
+            LoopQwen2ForSequenceClassification,
+            LoopQwen2ForTokenClassification,
+            LoopQwen2Model,
+            LoopQwen2PreTrainedModel,
         )
         from .models.qwen2_audio import (
             Qwen2AudioEncoder,

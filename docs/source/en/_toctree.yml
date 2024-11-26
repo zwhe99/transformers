@@ -462,6 +462,8 @@
         title: LongT5
       - local: model_doc/loopllama
         title: LoopLlama
+      - local: model_doc/loopqwen2
+        title: LoopQwen2
       - local: model_doc/luke
         title: LUKE
       - local: model_doc/m2m_100
