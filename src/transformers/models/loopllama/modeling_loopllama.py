@@ -56,6 +56,24 @@ logger = logging.get_logger(__name__)
 _CHECKPOINT_FOR_DOC = "meta-llama/Llama-3.1-8B"
 _CONFIG_FOR_DOC = "LoopLlamaConfig"
 
+class LoopModuleList(nn.ModuleList):
+    def __init__(self, modules, loop_mode="model-level", loop_times=1):
+        super().__init__(modules)
+        self.loop_mode = loop_mode
+        self.loop_times = loop_times
+
+        if loop_mode == "model-level":
+            self.indices = list(range(len(modules))) * loop_times
+            self.loop_ids = [lid + 1 for lid in range(self.loop_times) for mid in range(len(modules))]
+            self.start_of_loop = [mid == 0 for lid in range(self.loop_times) for mid in range(len(modules))]
+        else:
+            raise ValueError(f"loop mode {loop_mode} not recognized.")
+
+        assert len(self.indices) == len(self.loop_ids) == len(self.start_of_loop), "indices, loop_ids, and start_of_loop must have the same length"
+
+    def __iter__(self):
+        for idx, loop_id, start_of_loop in zip(self.indices, self.loop_ids, self.start_of_loop):
+            yield self[idx], loop_id, start_of_loop
 
 # Copied from transformers.models.llama.modeling_llama.LlamaRMSNorm with Llama->LoopLlama
 class LoopLlamaRMSNorm(nn.Module):
@@ -852,8 +870,13 @@ class LoopLlamaModel(LoopLlamaPreTrainedModel):
         self.vocab_size = config.vocab_size
 
         self.embed_tokens = nn.Embedding(config.vocab_size, config.hidden_size, self.padding_idx)
-        self.layers = nn.ModuleList(
-            [LoopLlamaDecoderLayer(config, layer_idx) for layer_idx in range(config.num_hidden_layers)]
+        self.loop_mode = config.loop_mode
+        self.loop_times = config.loop_times
+        self.loop_recall = config.loop_recall
+        self.layers = LoopModuleList(
+            [LoopLlamaDecoderLayer(config, layer_idx) for layer_idx in range(config.num_hidden_layers)],
+            loop_mode=config.loop_mode,
+            loop_times=config.loop_times,
         )
         self.norm = LoopLlamaRMSNorm(config.hidden_size, eps=config.rms_norm_eps)
         self.rotary_emb = LoopLlamaRotaryEmbedding(config=config)
@@ -935,15 +958,26 @@ class LoopLlamaModel(LoopLlamaPreTrainedModel):
         all_hidden_states = () if output_hidden_states else None
         all_self_attns = () if output_attentions else None
         next_decoder_cache = None
+        current_input = None
 
-        for decoder_layer in self.layers:
+        for decoder_layer, loop_id, start_of_loop in self.layers:
+            # record the input of the first loop if loop_recall is True
+            if loop_id == 1 and current_input is None and self.loop_recall:
+                current_input = hidden_states.clone()
+
+            # if the current layer is the start of a loop, and loop_recall is True, then perform recall
+            # note that the first loop does not need to perform recall
+            local_recall = self.loop_recall and start_of_loop and loop_id > 1
+
+            logger.debug(f"LoopLlamaModel - forward - loop_id: {loop_id}, start_of_loop: {start_of_loop}, local_recall: {local_recall}")
+
             if output_hidden_states:
                 all_hidden_states += (hidden_states,)
 
             if self.gradient_checkpointing and self.training:
                 layer_outputs = self._gradient_checkpointing_func(
                     decoder_layer.__call__,
-                    hidden_states,
+                    hidden_states if not local_recall else (current_input + hidden_states),
                     causal_mask,
                     position_ids,
                     past_key_values,
@@ -954,7 +988,7 @@ class LoopLlamaModel(LoopLlamaPreTrainedModel):
                 )
             else:
                 layer_outputs = decoder_layer(
-                    hidden_states,
+                    hidden_states if not local_recall else (current_input + hidden_states),
                     attention_mask=causal_mask,
                     position_ids=position_ids,
                     past_key_value=past_key_values,
