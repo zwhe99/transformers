@@ -414,7 +414,8 @@ class SchedulerType(ExplicitEnum):
     By default, it uses "linear". Internally, this retrieves `get_linear_schedule_with_warmup` scheduler from [`Trainer`].
     Scheduler types:
        - "linear" = get_linear_schedule_with_warmup
-       - "cosine" = get_cosine_schedule_with_warmup
+       - "cosine" = get_cosine_schedule_with_warmup_rasa
+       - "cosine_rasa" = get_cosine_rasa_schedule_with_warmup
        - "cosine_with_restarts" = get_cosine_with_hard_restarts_schedule_with_warmup
        - "polynomial" = get_polynomial_decay_schedule_with_warmup
        - "constant" =  get_constant_schedule
@@ -427,6 +428,7 @@ class SchedulerType(ExplicitEnum):
 
     LINEAR = "linear"
     COSINE = "cosine"
+    COSINE_RASA = "cosine_rasa"
     COSINE_WITH_RESTARTS = "cosine_with_restarts"
     POLYNOMIAL = "polynomial"
     CONSTANT = "constant"
@@ -435,7 +437,6 @@ class SchedulerType(ExplicitEnum):
     REDUCE_ON_PLATEAU = "reduce_lr_on_plateau"
     COSINE_WITH_MIN_LR = "cosine_with_min_lr"
     WARMUP_STABLE_DECAY = "warmup_stable_decay"
-
 
 class TrainerMemoryTracker:
     """
