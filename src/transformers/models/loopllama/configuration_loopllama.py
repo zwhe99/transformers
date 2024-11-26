@@ -169,6 +169,7 @@ class LoopLlamaConfig(PretrainedConfig):
         loop_mode="model-level",
         loop_times=1,
         loop_recall=True,
+        loop_random=False,
         **kwargs,
     ):
         self.vocab_size = vocab_size
@@ -197,6 +198,7 @@ class LoopLlamaConfig(PretrainedConfig):
         self.loop_mode = loop_mode
         self.loop_times = loop_times
         self.loop_recall = loop_recall
+        self.loop_random = loop_random
         # Validate the correctness of rotary position embeddings parameters
         # BC: if there is a 'type' field, copy it it to 'rope_type'.
         if self.rope_scaling is not None and "type" in self.rope_scaling:

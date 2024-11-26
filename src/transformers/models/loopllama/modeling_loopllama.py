@@ -18,6 +18,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import math
+import random
 from typing import List, Optional, Tuple, Union
 
 import torch
@@ -56,22 +57,38 @@ logger = logging.get_logger(__name__)
 _CHECKPOINT_FOR_DOC = "meta-llama/Llama-3.1-8B"
 _CONFIG_FOR_DOC = "LoopLlamaConfig"
 
-class LoopModuleList(nn.ModuleList):
-    def __init__(self, modules, loop_mode="model-level", loop_times=1):
+class ModelLevelLoopModuleList(nn.ModuleList):
+    def __init__(self, modules, loop_times=1, loop_random=False):
         super().__init__(modules)
-        self.loop_mode = loop_mode
         self.loop_times = loop_times
+        self.loop_random = loop_random
 
-        if loop_mode == "model-level":
-            self.indices = list(range(len(modules))) * loop_times
-            self.loop_ids = [lid + 1 for lid in range(self.loop_times) for mid in range(len(modules))]
-            self.start_of_loop = [mid == 0 for lid in range(self.loop_times) for mid in range(len(modules))]
-        else:
-            raise ValueError(f"loop mode {loop_mode} not recognized.")
+        self.indices = None
+        self.loop_ids = None
+        self.start_of_loop = None
 
-        assert len(self.indices) == len(self.loop_ids) == len(self.start_of_loop), "indices, loop_ids, and start_of_loop must have the same length"
+        self._generate_indices(loop_times)
+        self._generate_loop_ids(loop_times)
+        self._generate_start_of_loop(loop_times)
+
+    def _generate_indices(self, loop_times):
+        self.indices = list(range(len(self))) * loop_times
+
+    def _generate_loop_ids(self, loop_times):
+        self.loop_ids = [lid + 1 for lid in range(loop_times) for mid in range(len(self))]
+
+    def _generate_start_of_loop(self, loop_times):
+        self.start_of_loop = [mid == 0 for lid in range(loop_times) for mid in range(len(self))]
 
     def __iter__(self):
+        if self.training and self.loop_random:
+            loop_times = random.randint(1, self.loop_times)
+        else:
+            loop_times = self.loop_times
+        self._generate_indices(loop_times)
+        self._generate_loop_ids(loop_times)
+        self._generate_start_of_loop(loop_times)
+
         for idx, loop_id, start_of_loop in zip(self.indices, self.loop_ids, self.start_of_loop):
             yield self[idx], loop_id, start_of_loop
 
@@ -873,10 +890,18 @@ class LoopLlamaModel(LoopLlamaPreTrainedModel):
         self.loop_mode = config.loop_mode
         self.loop_times = config.loop_times
         self.loop_recall = config.loop_recall
-        self.layers = LoopModuleList(
+        self.loop_random = config.loop_random
+
+        loop_module_list_class = None
+        if config.loop_mode == "model-level":
+            loop_module_list_class = ModelLevelLoopModuleList
+        else:
+            raise ValueError(f"loop mode {config.loop_mode} not recognized.")
+
+        self.layers = loop_module_list_class(
             [LoopLlamaDecoderLayer(config, layer_idx) for layer_idx in range(config.num_hidden_layers)],
-            loop_mode=config.loop_mode,
             loop_times=config.loop_times,
+            loop_random=config.loop_random,
         )
         self.norm = LoopLlamaRMSNorm(config.hidden_size, eps=config.rms_norm_eps)
         self.rotary_emb = LoopLlamaRotaryEmbedding(config=config)
