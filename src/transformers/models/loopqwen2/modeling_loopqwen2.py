@@ -903,6 +903,10 @@ class LoopQwen2Model(LoopQwen2PreTrainedModel):
             ipt_total_num_loops = ipt_stage1_num_loops + ipt_stage2_num_loops
 
         for decoder_layer, loop_id, start_of_loop, end_of_loop in self.layers:
+            # if loop_ipt is True, only the first stage does not need to record gradients
+            enable_grad = (not self.loop_ipt) or loop_id > ipt_stage1_num_loops
+            torch.set_grad_enabled(enable_grad)
+
             # record the input of the first loop if loop_recall is True
             if loop_id == 1 and current_input is None and self.loop_recall:
                 current_input = hidden_states.clone()
@@ -916,7 +920,7 @@ class LoopQwen2Model(LoopQwen2PreTrainedModel):
             if output_hidden_states:
                 all_hidden_states += (hidden_states,)
 
-            if self.gradient_checkpointing and self.training:
+            if self.gradient_checkpointing and self.training and enable_grad:
                 layer_outputs = self._gradient_checkpointing_func(
                     decoder_layer.__call__,
                     hidden_states if not local_recall else (current_input + hidden_states),
@@ -947,10 +951,6 @@ class LoopQwen2Model(LoopQwen2PreTrainedModel):
 
             if output_attentions:
                 all_self_attns += (layer_outputs[1],)
-            
-            if self.loop_ipt and loop_id == ipt_stage1_num_loops and end_of_loop:
-                # detach the hidden state
-                hidden_states = hidden_states.detach()
 
             if self.loop_ipt and loop_id == ipt_total_num_loops and end_of_loop:
                 # quit the loop
