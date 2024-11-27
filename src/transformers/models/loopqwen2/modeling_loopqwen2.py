@@ -903,8 +903,9 @@ class LoopQwen2Model(LoopQwen2PreTrainedModel):
             ipt_total_num_loops = ipt_stage1_num_loops + ipt_stage2_num_loops
 
         for decoder_layer, loop_id, start_of_loop, end_of_loop in self.layers:
-            # if loop_ipt is True, only the first stage does not need to record gradients
-            enable_grad = (not self.loop_ipt) or loop_id > ipt_stage1_num_loops
+            # if loop_ipt is True, the first stage does not need to record gradients
+            enable_grad = (not self.loop_ipt) or (loop_id > ipt_stage1_num_loops)
+            enable_grad = enable_grad and self.training
             torch.set_grad_enabled(enable_grad)
 
             # record the input of the first loop if loop_recall is True
