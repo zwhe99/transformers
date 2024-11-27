@@ -893,6 +893,14 @@ class LoopQwen2Model(LoopQwen2PreTrainedModel):
         all_self_attns = () if output_attentions else None
         next_decoder_cache = None
         current_input = None
+        ipt_stage1_num_loops = None
+        ipt_stage2_num_loops = None
+        ipt_total_num_loops = None
+
+        if self.loop_ipt:
+            ipt_stage1_num_loops = random.randint(0, self.loop_times - 1)
+            ipt_stage2_num_loops = random.randint(1, self.loop_times - ipt_stage1_num_loops)
+            ipt_total_num_loops = ipt_stage1_num_loops + ipt_stage2_num_loops
 
         for decoder_layer, loop_id, start_of_loop, end_of_loop in self.layers:
             # record the input of the first loop if loop_recall is True
@@ -939,6 +947,14 @@ class LoopQwen2Model(LoopQwen2PreTrainedModel):
 
             if output_attentions:
                 all_self_attns += (layer_outputs[1],)
+            
+            if self.loop_ipt and loop_id == ipt_stage1_num_loops and end_of_loop:
+                # detach the hidden state
+                hidden_states = hidden_states.detach()
+
+            if self.loop_ipt and loop_id == ipt_total_num_loops and end_of_loop:
+                # quit the loop
+                break
 
         hidden_states = self.norm(hidden_states)
 
