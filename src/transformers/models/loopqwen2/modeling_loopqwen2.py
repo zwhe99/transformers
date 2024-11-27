@@ -897,16 +897,16 @@ class LoopQwen2Model(LoopQwen2PreTrainedModel):
         ipt_stage2_num_loops = None
         ipt_total_num_loops = None
 
-        if self.loop_ipt:
+        if self.loop_ipt and self.training:
             ipt_stage1_num_loops = random.randint(0, self.loop_times - 1)
             ipt_stage2_num_loops = random.randint(1, self.loop_times - ipt_stage1_num_loops)
             ipt_total_num_loops = ipt_stage1_num_loops + ipt_stage2_num_loops
 
         for decoder_layer, loop_id, start_of_loop, end_of_loop in self.layers:
             # if loop_ipt is True, the first stage does not need to record gradients
-            enable_grad = (not self.loop_ipt) or (loop_id > ipt_stage1_num_loops)
-            enable_grad = enable_grad and self.training
-            torch.set_grad_enabled(enable_grad)
+            if self.loop_ipt and self.training:
+                enable_grad = loop_id > ipt_stage1_num_loops
+                torch.set_grad_enabled(enable_grad)
 
             # record the input of the first loop if loop_recall is True
             if loop_id == 1 and current_input is None and self.loop_recall:
@@ -921,7 +921,7 @@ class LoopQwen2Model(LoopQwen2PreTrainedModel):
             if output_hidden_states:
                 all_hidden_states += (hidden_states,)
 
-            if self.gradient_checkpointing and self.training and enable_grad:
+            if self.gradient_checkpointing and self.training and (not self.loop_ipt or enable_grad):
                 layer_outputs = self._gradient_checkpointing_func(
                     decoder_layer.__call__,
                     hidden_states if not local_recall else (current_input + hidden_states),
@@ -953,7 +953,7 @@ class LoopQwen2Model(LoopQwen2PreTrainedModel):
             if output_attentions:
                 all_self_attns += (layer_outputs[1],)
 
-            if self.loop_ipt and loop_id == ipt_total_num_loops and end_of_loop:
+            if self.loop_ipt and self.training and loop_id == ipt_total_num_loops and end_of_loop:
                 # quit the loop
                 break
 
