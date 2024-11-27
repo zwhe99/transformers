@@ -170,6 +170,7 @@ class LoopLlamaConfig(PretrainedConfig):
         loop_times=1,
         loop_recall=True,
         loop_random=False,
+        loop_ipt=False, # Incremental Progress Training
         **kwargs,
     ):
         self.vocab_size = vocab_size
@@ -199,6 +200,9 @@ class LoopLlamaConfig(PretrainedConfig):
         self.loop_times = loop_times
         self.loop_recall = loop_recall
         self.loop_random = loop_random
+        self.loop_ipt = loop_ipt
+        assert not (self.loop_random and self.loop_ipt), "loop_random and loop_ipt cannot be both True"
+
         # Validate the correctness of rotary position embeddings parameters
         # BC: if there is a 'type' field, copy it it to 'rope_type'.
         if self.rope_scaling is not None and "type" in self.rope_scaling:

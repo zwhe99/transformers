@@ -181,6 +181,8 @@ class LoopQwen2Config(PretrainedConfig):
         self.loop_times = loop_times
         self.loop_recall = loop_recall
         self.loop_random = loop_random
+        assert not (self.loop_random and self.loop_ipt), "loop_random and loop_ipt cannot be both True"
+
         # Validate the correctness of rotary position embeddings parameters
         # BC: if there is a 'type' field, move it to 'rope_type'.
         if self.rope_scaling is not None and "type" in self.rope_scaling:

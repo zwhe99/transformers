@@ -5475,6 +5475,7 @@ class ModelLevelLoopModuleList(nn.ModuleList):
         self._generate_indices(loop_times)
         self._generate_loop_ids(loop_times)
         self._generate_start_of_loop(loop_times)
+        self._generate_end_of_loop(loop_times)
 
     def _generate_indices(self, loop_times):
         self.indices = list(range(len(self))) * loop_times
@@ -5485,6 +5486,9 @@ class ModelLevelLoopModuleList(nn.ModuleList):
     def _generate_start_of_loop(self, loop_times):
         self.start_of_loop = [mid == 0 for lid in range(loop_times) for mid in range(len(self))]
 
+    def _generate_end_of_loop(self, loop_times):
+        self.end_of_loop = [mid == len(self) - 1 for lid in range(loop_times) for mid in range(len(self))]
+
     def __iter__(self):
         if self.training and self.loop_random:
             loop_times = random.randint(1, self.loop_times)
@@ -5493,9 +5497,12 @@ class ModelLevelLoopModuleList(nn.ModuleList):
         self._generate_indices(loop_times)
         self._generate_loop_ids(loop_times)
         self._generate_start_of_loop(loop_times)
+        self._generate_end_of_loop(loop_times)
 
-        for idx, loop_id, start_of_loop in zip(self.indices, self.loop_ids, self.start_of_loop):
-            yield self[idx], loop_id, start_of_loop
+        for idx, loop_id, start_of_loop, end_of_loop in zip(
+            self.indices, self.loop_ids, self.start_of_loop, self.end_of_loop
+        ):
+            yield self[idx], loop_id, start_of_loop, end_of_loop
 
 
 def unwrap_model(model: nn.Module, recursive: bool = False) -> nn.Module:

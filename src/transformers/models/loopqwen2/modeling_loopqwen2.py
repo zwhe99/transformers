@@ -894,7 +894,7 @@ class LoopQwen2Model(LoopQwen2PreTrainedModel):
         next_decoder_cache = None
         current_input = None
 
-        for decoder_layer, loop_id, start_of_loop in self.layers:
+        for decoder_layer, loop_id, start_of_loop, end_of_loop in self.layers:
             # record the input of the first loop if loop_recall is True
             if loop_id == 1 and current_input is None and self.loop_recall:
                 current_input = hidden_states.clone()
