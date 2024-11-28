@@ -5471,6 +5471,7 @@ class ModelLevelLoopModuleList(nn.ModuleList):
         self.indices = None
         self.loop_ids = None
         self.start_of_loop = None
+        self.end_of_loop = None
 
         self._generate_indices(loop_times)
         self._generate_loop_ids(loop_times)
