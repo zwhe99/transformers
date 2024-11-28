@@ -160,6 +160,15 @@ class BaseModelOutputWithPast(ModelOutput):
 
 
 @dataclass
+class BaseModelOutputWithPastAndLoss(ModelOutput):
+    last_hidden_state: torch.FloatTensor = None
+    past_key_values: Optional[Tuple[Tuple[torch.FloatTensor]]] = None
+    hidden_states: Optional[Tuple[torch.FloatTensor, ...]] = None
+    attentions: Optional[Tuple[torch.FloatTensor, ...]] = None
+    loss: Optional[torch.FloatTensor] = None
+
+
+@dataclass
 class BaseModelOutputWithCrossAttentions(ModelOutput):
     """
     Base class for model's outputs, with potential hidden states and attentions.

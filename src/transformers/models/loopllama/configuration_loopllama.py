@@ -171,6 +171,7 @@ class LoopLlamaConfig(PretrainedConfig):
         loop_recall=True,
         loop_random=False,
         loop_ipt=False, # Incremental Progress Training
+        loop_loss_mode="last-loop",
         **kwargs,
     ):
         self.vocab_size = vocab_size
@@ -201,6 +202,7 @@ class LoopLlamaConfig(PretrainedConfig):
         self.loop_recall = loop_recall
         self.loop_random = loop_random
         self.loop_ipt = loop_ipt
+        self.loop_loss_mode = loop_loss_mode
         assert not (self.loop_random and self.loop_ipt), "loop_random and loop_ipt cannot be both True"
 
         # Validate the correctness of rotary position embeddings parameters

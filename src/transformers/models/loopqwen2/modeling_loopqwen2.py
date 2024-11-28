@@ -33,6 +33,7 @@ from ...generation import GenerationMixin
 from ...modeling_attn_mask_utils import AttentionMaskConverter
 from ...modeling_outputs import (
     BaseModelOutputWithPast,
+    BaseModelOutputWithPastAndLoss,
     CausalLMOutputWithPast,
     QuestionAnsweringModelOutput,
     SequenceClassifierOutputWithPast,
@@ -796,14 +797,17 @@ class LoopQwen2Model(LoopQwen2PreTrainedModel):
         self.loop_times = config.loop_times
         self.loop_recall = config.loop_recall
         self.loop_random = config.loop_random
+        self.loop_ipt = config.loop_ipt
+        self.loop_loss_mode = config.loop_loss_mode
 
         logger.debug(f"""LoopLlamaModel.__init__:
             loop_mode: {config.loop_mode}
             loop_times: {config.loop_times}
             loop_recall: {config.loop_recall}
             loop_random: {config.loop_random}
-            loop_ipt: {config.loop_ipt}"""
-        )
+            loop_ipt: {config.loop_ipt}
+            loop_loss_mode: {config.loop_loss_mode}
+        """)
 
         loop_module_list_class = None
         if config.loop_mode == "model-level":
@@ -843,7 +847,8 @@ class LoopQwen2Model(LoopQwen2PreTrainedModel):
         output_hidden_states: Optional[bool] = None,
         return_dict: Optional[bool] = None,
         cache_position: Optional[torch.LongTensor] = None,
-    ) -> Union[Tuple, BaseModelOutputWithPast]:
+        **cal_loss_kwargs
+    ) -> Union[Tuple, BaseModelOutputWithPast, BaseModelOutputWithPastAndLoss]:
         output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
         output_hidden_states = (
             output_hidden_states if output_hidden_states is not None else self.config.output_hidden_states
@@ -851,6 +856,16 @@ class LoopQwen2Model(LoopQwen2PreTrainedModel):
         use_cache = use_cache if use_cache is not None else self.config.use_cache
 
         return_dict = return_dict if return_dict is not None else self.config.use_return_dict
+
+        # calculate loss
+        # 1. training
+        # 2. labels are provided
+        # 3. loop_loss_mode is not "last-loop". "last-loop" is default behavior and will be handled in LoopQwen2ForCausalLM.forward
+        labels = cal_loss_kwargs.get("labels", None)
+        lm_head = cal_loss_kwargs.get("lm_head", None)
+        assert not ((labels is not None) ^ (lm_head is not None)), "labels and lm_head should be provided together"
+        cal_loss = self.training and labels is not None and self.loop_loss_mode != "last-loop"
+        total_loss = 0 if cal_loss else None
 
         if (input_ids is None) ^ (inputs_embeds is not None):
             raise ValueError("You must specify exactly one of input_ids or inputs_embeds")
@@ -961,6 +976,25 @@ class LoopQwen2Model(LoopQwen2PreTrainedModel):
             if output_attentions:
                 all_self_attns += (layer_outputs[1],)
 
+            local_cal_loss = cal_loss and end_of_loop # only the end of the a loop needs to calculate loss
+            if self.loop_loss_mode == "all-loop":
+                pass
+            elif self.loop_loss_mode == "last-loop":
+                assert not cal_loss # cal_loss should be False in this mode
+            else:
+                raise ValueError(f"loop_loss_mode {self.loop_loss_mode} not recognized.")
+
+            if local_cal_loss:
+                hidden_states_for_loss_cal = self.norm(hidden_states)
+                if self.config.pretraining_tp > 1:
+                    lm_head_slices = lm_head.weight.split(self.vocab_size // self.config.pretraining_tp, dim=0)
+                    logits = [F.linear(hidden_states_for_loss_cal, lm_head_slices[i]) for i in range(self.config.pretraining_tp)]
+                    logits = torch.cat(logits, dim=-1)
+                else:
+                    # Only compute necessary logits, and do not upcast them to float if we are not computing the loss
+                    logits = lm_head(hidden_states_for_loss_cal)
+                total_loss += self.loss_function(logits=logits, labels=labels, vocab_size=self.vocab_size)
+
             if self.loop_ipt and self.training and loop_id == ipt_total_num_loops and end_of_loop:
                 # quit the loop
                 break
@@ -975,14 +1009,25 @@ class LoopQwen2Model(LoopQwen2PreTrainedModel):
         if return_legacy_cache:
             next_cache = next_cache.to_legacy_cache()
 
+        assert return_dict, "LoopQwen2Model.forward should return a dict"
         if not return_dict:
             return tuple(v for v in [hidden_states, next_cache, all_hidden_states, all_self_attns] if v is not None)
-        return BaseModelOutputWithPast(
-            last_hidden_state=hidden_states,
-            past_key_values=next_cache,
-            hidden_states=all_hidden_states,
-            attentions=all_self_attns,
-        )
+
+        if cal_loss:
+            return BaseModelOutputWithPastAndLoss(
+                last_hidden_state=hidden_states,
+                past_key_values=next_cache,
+                hidden_states=all_hidden_states,
+                attentions=all_self_attns,
+                loss=total_loss,
+            )
+        else:
+            return BaseModelOutputWithPast(
+                last_hidden_state=hidden_states,
+                past_key_values=next_cache,
+                hidden_states=all_hidden_states,
+                attentions=all_self_attns,
+            )
 
     def _update_causal_mask(
         self,
