@@ -1217,6 +1217,8 @@ class LlamaForCausalLM(LlamaPreTrainedModel, GenerationMixin):
             output = (logits,) + outputs[1:]
             return (loss,) + output if loss is not None else output
 
+        logger.debug(f"loss: {loss:.6f} | logits: {logits[0][0][0]}")
+
         return CausalLMOutputWithPast(
             loss=loss,
             logits=logits,
