@@ -859,6 +859,14 @@ class LoopLlamaModel(LoopLlamaPreTrainedModel):
         self.loop_random = config.loop_random
         self.loop_ipt = config.loop_ipt
 
+        logger.debug(f"""LoopLlamaModel.__init__:
+            loop_mode: {config.loop_mode}
+            loop_times: {config.loop_times}
+            loop_recall: {config.loop_recall}
+            loop_random: {config.loop_random}
+            loop_ipt: {config.loop_ipt}"""
+        )
+
         loop_module_list_class = None
         if config.loop_mode == "model-level":
             loop_module_list_class = ModelLevelLoopModuleList
@@ -968,13 +976,13 @@ class LoopLlamaModel(LoopLlamaPreTrainedModel):
 
             # record the input of the first loop if loop_recall is True
             if loop_id == 1 and current_input is None and self.loop_recall:
-                current_input = hidden_states.clone()
+                current_input = hidden_states.clone().detach()
 
             # if the current layer is the start of a loop, and loop_recall is True, then perform recall
             # note that the first loop does not need to perform recall
             local_recall = self.loop_recall and start_of_loop and loop_id > 1
 
-            logger.debug(f"LoopLlamaModel.forward - loop_id: {loop_id}, start_of_loop: {start_of_loop}, local_recall: {local_recall}")
+            logger.debug(f"LoopLlamaModel.forward - loop_id: {loop_id}, start_of_loop: {start_of_loop}, end_of_loop: {end_of_loop}, local_recall: {local_recall}")
 
             if output_hidden_states:
                 all_hidden_states += (hidden_states,)
