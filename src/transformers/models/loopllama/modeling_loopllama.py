@@ -1051,6 +1051,7 @@ class LoopLlamaModel(LoopLlamaPreTrainedModel):
                     # Only compute necessary logits, and do not upcast them to float if we are not computing the loss
                     logits = lm_head(hidden_states_for_loss_cal)
                 total_loss += self.loss_function(logits=logits, labels=labels, vocab_size=self.vocab_size)
+                logger.debug(f"LoopLlamaModel.forward - loop_id: {loop_id}, start_of_loop: {start_of_loop}, end_of_loop: {end_of_loop}, total_loss: {total_loss}")
 
             if self.loop_ipt and self.training and loop_id == ipt_total_num_loops and end_of_loop:
                 # quit the loop
