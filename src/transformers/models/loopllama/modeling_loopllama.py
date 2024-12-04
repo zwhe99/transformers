@@ -863,6 +863,8 @@ class LoopLlamaModel(LoopLlamaPreTrainedModel):
         if self.loop_loss_mode == "all-loop":
             self.config.loss_type = "ForCausalLM"
 
+        assert not (config.loop_random and config.loop_ipt), "loop_random and loop_ipt cannot be both True"
+
         logger.debug(f"""LoopLlamaModel.__init__:
             loop_mode: {config.loop_mode}
             loop_times: {config.loop_times}
