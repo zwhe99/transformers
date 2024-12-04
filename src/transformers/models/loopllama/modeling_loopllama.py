@@ -922,6 +922,7 @@ class LoopLlamaModel(LoopLlamaPreTrainedModel):
         # 3. loop_loss_mode is not "last-loop". "last-loop" is default behavior and will be handled in LoopLlamaForCausalLM.forward
         labels = cal_loss_kwargs.get("labels", None)
         lm_head = cal_loss_kwargs.get("lm_head", None)
+        loss_kwargs = cal_loss_kwargs.get("loss_kwargs", {})
         assert not ((labels is not None) ^ (lm_head is not None)), "labels and lm_head should be provided together"
         cal_loss = self.training and labels is not None and self.loop_loss_mode != "last-loop"
         total_loss = 0 if cal_loss else None
@@ -1050,7 +1051,7 @@ class LoopLlamaModel(LoopLlamaPreTrainedModel):
                 else:
                     # Only compute necessary logits, and do not upcast them to float if we are not computing the loss
                     logits = lm_head(hidden_states_for_loss_cal)
-                total_loss += self.loss_function(logits=logits, labels=labels, vocab_size=self.vocab_size)
+                total_loss += self.loss_function(logits=logits, labels=labels, vocab_size=self.vocab_size, **loss_kwargs)
                 logger.debug(f"LoopLlamaModel.forward - loop_id: {loop_id}, start_of_loop: {start_of_loop}, end_of_loop: {end_of_loop}, total_loss: {total_loss}")
 
             if self.loop_ipt and self.training and loop_id == ipt_total_num_loops and end_of_loop:
@@ -1308,6 +1309,7 @@ class LoopLlamaForCausalLM(LoopLlamaPreTrainedModel, GenerationMixin):
             cache_position=cache_position,
             labels=labels,
             lm_head=self.lm_head,
+            loss_kwargs=loss_kwargs,
         )
 
         hidden_states = outputs[0]
